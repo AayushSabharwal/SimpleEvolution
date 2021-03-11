@@ -1,4 +1,5 @@
 using Agents
+using Random
 
 const AXIAL_DIRECTIONS = [-1, 0, 1]
 
@@ -57,6 +58,7 @@ function initialize_model(
         :sensory_radius_std => sensory_radius_std,
         :reproduction_threshold_std => reproduction_threshold_std,
         :reproduction_energy_cost => reproduction_energy_cost,
+        :speed_std => speed_std,
     )
 
     # non-periodic euclidean space
@@ -67,7 +69,7 @@ function initialize_model(
     for i ∈ 1:n_bacteria
         add_agent!(Bacterium, model, 0, energy, sensory_radius, threshold, speed, (-1, -1))
     end
-    
+
     # add food wherever it is nonzero
     for pos ∈ eachindex(food_distribution)
         food_distribution[pos] > 0 || continue
@@ -131,7 +133,7 @@ end
 
 function agent_step!(bact::Bacterium, model::ABM)
     # die, of age or startvation
-    (bact.age < model.lifetime || bact.energy <= 0)|| (kill_agent!(bact, model); return)
+    (bact.age > model.lifetime || bact.energy <= 0) && (kill_agent!(bact, model); return)
 
     # grow older
     bact.age += 1
@@ -191,8 +193,8 @@ function agent_step!(bact::Bacterium, model::ABM)
     end
 
     # move
-    move_agent!(bact, model, bact.pos .+ movement)
-    
+    move_agent!(bact, clamp.(bact.pos .+ movement, 1, size(model.space.s)), model)
+
     # subtract cost of movement and looking
     bact.energy -=
         model.sensory_radius_cost_factor * bact.sensory_radius +
