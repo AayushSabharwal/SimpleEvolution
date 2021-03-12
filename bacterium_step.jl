@@ -3,10 +3,10 @@
 
 `erf` is `eat_rate_factor`. Makes `bact` eat from `food`.
 """
-function eat(bact::Bacterium, food::Food, erf::Float64)
-    eaten = min(erf * bact.speed, food.current_food)
+function eat(bact::Bacterium, food::Food, model::ABM)
+    eaten = min(model.eat_rate_factor * bact.speed, food.current_food)
     food.current_food -= eaten
-    bact.energy += eaten
+    bact.energy += eaten * model.input_energy_density / food.regen_rate
 end
 
 """
@@ -22,20 +22,19 @@ function reproduce!(bact::Bacterium, model::ABM)
         model,
         0,
         (bact.energy - model.reproduction_energy_cost) / 2.0,
-        inherit(bact.sensory_radius, model.rng, model.sensory_radius_std),
-        inherit(bact.reproduction_threshold, model.rng, model.reproduction_threshold_std),
-        inherit(bact.speed, model.rng, model.speed_std),
+        inherit(bact.sensory_radius, model.rng, model.σ_sensory_radius),
+        inherit(bact.reproduction_threshold, model.rng, model.σ_reproduction_threshold),
+        inherit(bact.speed, model.rng, model.σ_speed),
         bact.food_target,
     )
 
     bact.age = 0
-    bact.energy -= model.reproduction_energy_cost
-    bact.energy /= 2.0
+    bact.energy = (bact.energy - model.reproduction_energy_cost) / 2.0
 
-    bact.sensory_radius = inherit(bact.sensory_radius, model.rng, model.sensory_radius_std)
+    bact.sensory_radius = inherit(bact.sensory_radius, model.rng, model.σ_sensory_radius)
     bact.reproduction_threshold =
-        inherit(bact.reproduction_threshold, model.rng, model.reproduction_threshold_std)
-    bact.speed = inherit(bact.speed, model.rng, model.speed_std)
+        inherit(bact.reproduction_threshold, model.rng, model.σ_reproduction_threshold)
+    bact.speed = inherit(bact.speed, model.rng, model.σ_speed)
 end
 
 function agent_step!(bact::Bacterium, model::ABM)
@@ -58,7 +57,7 @@ function agent_step!(bact::Bacterium, model::ABM)
             bact.food_target = (-1, -1)
         else
             # eat
-            eat(bact, food, model.eat_rate_factor)
+            eat(bact, food, model)
             return
         end
     end
@@ -104,6 +103,6 @@ function agent_step!(bact::Bacterium, model::ABM)
 
     # subtract cost of movement and looking
     bact.energy -=
-        model.sensory_radius_cost_factor * bact.sensory_radius +
-        model.distance_cost_factor * max(abs.(movement)...)
+        model.sensory_radius_cost * bact.sensory_radius +
+        model.distance_cost * max(abs.(movement)...)
 end

@@ -1,5 +1,7 @@
 [deps]
 Agents = "46ada45e-f475-11e8-01d0-f70cc89e6671"
+CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
 InteractiveDynamics = "ec714cd0-5f51-11eb-0b6e-452e7367ff84"
 JuliaFormatter = "98e50ef6-434e-11e9-1051-2b60c6c9e899"
