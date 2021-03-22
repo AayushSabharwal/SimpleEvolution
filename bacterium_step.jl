@@ -1,7 +1,7 @@
 """
-    eat(bact::Bacterium, food::Food, erf::Float64)
+    eat(bact::Bacterium, food::Food, model::ABM)
 
-`erf` is `eat_rate_factor`. Makes `bact` eat from `food`.
+makes `bact` eat from `food`
 """
 function eat(bact::Bacterium, food::Food, model::ABM)
     eaten = min(model.eat_rate_factor * bact.speed, food.current_food)
