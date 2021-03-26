@@ -7,7 +7,7 @@ function reproduce!(food::Food, pos::Dims{2}, model::ABM)
     add_agent!(
         pos,
         Food,
-        model, 
+        model,
         inherit(food.food_cap, model.rng, model.σ_food_cap),
         (food.current_food - model.spread_cost) / 2.0,
         inherit(food.regen_rate, model.rng, model.σ_regen_rate),
