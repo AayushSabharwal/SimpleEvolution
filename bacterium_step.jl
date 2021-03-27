@@ -1,15 +1,4 @@
 """
-    eat(bact::Bacterium, food::Food, model::ABM)
-
-makes `bact` eat from `food`
-"""
-function eat(bact::Bacterium, food::Food, model::ABM)
-    eaten = min(model.eat_rate_factor * bact.speed, food.current_food)
-    food.current_food -= eaten
-    bact.energy += eaten * model.input_energy_density / food.regen_rate
-end
-
-"""
     reproduce!(bact::Bacterium, model::ABM)
 
 Simulates reproduction of bacteria. Energy is halved after subtracting a cost. Inherited features are
@@ -20,6 +9,7 @@ function reproduce!(bact::Bacterium, model::ABM)
         bact.pos,
         Bacterium,
         model,
+        bact.species,
         0,
         (bact.energy - model.reproduction_energy_cost) / 2.0,
         inherit(bact.sensory_radius, model.rng, model.σ_sensory_radius),
@@ -48,32 +38,29 @@ function agent_step!(bact::Bacterium, model::ABM)
     bact.energy >= bact.reproduction_threshold && reproduce!(bact, model)
 
     # if currently on a food source
-    if !isempty(bact.pos, model.food)
-        # get the food
-        food = first(agents_in_position(bact.pos, model.food))
-        # if there's no food on it
-        if food.current_food == 0
-            # can't eat, so look for something else
-            bact.food_target = (-1, -1)
-        else
-            # eat
-            eat(bact, food, model)
-            return
-        end
+    if model.food[bact.pos...] > 0.0
+        # eat
+        eaten = min(model.food[bact.pos...], bact.speed * model.eat_rate_factor)
+        model.food[bact.pos...] -= eaten
+        bact.energy += eaten
+        return
+    else
+        # can't eat, so look for something else
+        bact.food_target = (-1, -1)
     end
 
     # if bact doesn't see any food
     if bact.food_target == (-1, -1)
-        best_id = -1
+        best_pos = (-1, -1)
         # look for the best food nearby
-        for id in nearby_ids(bact.pos, model.food, bact.sensory_radius)
+        for pos in nearby_positions(bact.pos, model, bact.sensory_radius)
             (
-                best_id == -1 ||
-                model.food[best_id].current_food < model.food[id].current_food
+                best_pos == (-1, -1) ||
+                model.food[best_pos...] < model.food[pos...]
             ) || continue
-            best_id = id
+            best_pos = pos
         end
-        best_id != -1 && (bact.food_target = (-1, -1))
+        best_pos != (-1, -1) && (bact.food_target = best_pos)
     end
 
     # if we found some food or already had eyes on it

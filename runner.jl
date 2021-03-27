@@ -2,6 +2,8 @@ using DataFrames
 using StatsBase
 using CSV
 using ProgressMeter
+using OnlineStats
+using HDF5
 
 function run!(
     model::ABM,
@@ -14,9 +16,8 @@ function run!(
 )
     agg_data = DataFrame(
         step = Int[],
+        species = Int[],
         nbact = Int[],
-        nfood = Int[],
-        tot_food = Float64[],
         μ_energy = Float64[],
         σ_energy = Float64[],
         μ_sens = Float64[],
@@ -25,46 +26,62 @@ function run!(
         σ_repr = Float64[],
         μ_speed = Float64[],
         σ_speed = Float64[],
-        μ_food_cap = Float64[],
-        σ_food_cap = Float64[],
-        μ_regen_rate = Float64[],
-        σ_regen_rate = Float64[],
     )
     bactlogdf = DataFrame(
         step = Int[],
         age = Int[],
+        species = Int[],
         sens = Float64[],
         repr = Float64[],
         speed = Float64[],
     )
-    foodlogdf = DataFrame(
-        step = Int[],
-        food_cap = Float64[],
-        regen_rate = Float64[],
-        x = Int[],
-        y = Int[],
-    )
+    
+    foodf = h5open(foodlog, "w")
+    fdata = foodf["log"] = zeros((nsteps+1, size(model.food)...))
     appendbact = false
-    appendfood = false
     appendagg = false
 
     p = Progress(nsteps; barglyphs = BarGlyphs("[=> ]"), color = :blue)
     for i = 0:nsteps
-        push!(
-            agg_data,
-            (
-                i,
-                nagents(model),
-                nagents(model.food),
-                sum(a.current_food for a in allagents(model.food)),
-                mean_and_std([a.energy for a in allagents(model)])...,
-                mean_and_std([a.sensory_radius for a in allagents(model)])...,
-                mean_and_std([a.reproduction_threshold for a in allagents(model)])...,
-                mean_and_std([a.speed for a in allagents(model)])...,
-                mean_and_std([a.food_cap for a in allagents(model.food)])...,
-                mean_and_std([a.regen_rate for a in allagents(model.food)])...,
-            ),
-        )
+        count = [0 for _ in 1:model.nspecies]
+        energy_means = [Mean() for _ in 1:model.nspecies]
+        energy_vars = [Variance() for _ in 1:model.nspecies]
+        sens_means = [Mean() for _ in 1:model.nspecies]
+        sens_vars = [Variance() for _ in 1:model.nspecies]
+        repr_means = [Mean() for _ in 1:model.nspecies]
+        repr_vars = [Variance() for _ in 1:model.nspecies]
+        speed_means = [Mean() for _ in 1:model.nspecies]
+        speed_vars = [Variance() for _ in 1:model.nspecies]
+
+        for a in allagents(model)
+            count[a.species] += 1
+            fit!(energy_means[a.species], a.energy)
+            fit!(energy_vars[a.species], a.energy)
+            fit!(sens_means[a.species], a.sensory_radius)
+            fit!(sens_vars[a.species], a.sensory_radius)
+            fit!(repr_means[a.species], a.reproduction_threshold)
+            fit!(repr_vars[a.species], a.reproduction_threshold)
+            fit!(speed_means[a.species], a.speed)
+            fit!(speed_vars[a.species], a.speed)
+        end
+        for sp in 1:model.nspecies
+            push!(
+                agg_data,
+                (
+                    i,
+                    sp,
+                    count[sp],
+                    value(energy_means[sp]),
+                    value(energy_vars[sp]),
+                    value(sens_means[sp]),
+                    value(sens_vars[sp]),
+                    value(repr_means[sp]),
+                    value(repr_vars[sp]),
+                    value(speed_means[sp]),
+                    value(speed_vars[sp]),
+                ),
+            )
+        end
         if size(agg_data, 1) >= chunk_size
             CSV.write(agglog, agg_data; append = appendagg)
             appendagg || (appendagg = true)
@@ -75,28 +92,24 @@ function run!(
             for a in allagents(model)
                 push!(
                     bactlogdf,
-                    (i, a.age, a.sensory_radius, a.reproduction_threshold, a.speed),
+                    (i, a.age, a.species, a.sensory_radius, a.reproduction_threshold, a.speed),
                 )
             end
-            for a in allagents(model.food)
-                push!(foodlogdf, (i, a.food_cap, a.regen_rate, a.pos[1], a.pos[2]))
-            end
+            
             if size(bactlogdf, 1) >= chunk_size
                 CSV.write(bactlog, bactlogdf; append = appendbact)
                 appendbact || (appendbact = true)
                 empty!(bactlogdf)
             end
-            if size(foodlogdf, 1) >= chunk_size
-                CSV.write(foodlog, foodlogdf; append = appendfood)
-                appendfood || (appendfood = true)
-                empty!(foodlogdf)
-            end
+
+            fdata[i+1,:,:] = model.food
         end
         Agents.step!(model, agent_step!, food_step!)
         ProgressMeter.next!(p)
     end
     size(agg_data, 1) > 0 && CSV.write(agglog, agg_data; append = appendagg)
     size(bactlogdf, 1) > 0 && CSV.write(bactlog, bactlogdf; append = appendbact)
-    size(foodlogdf, 1) > 0 && CSV.write(foodlog, foodlogdf; append = appendfood)
+    foodf["cap"] = model.food_data.food_cap
+    close(foodf)
     nothing
 end
