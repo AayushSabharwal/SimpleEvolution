@@ -72,13 +72,13 @@ function run!(
                     sp,
                     count[sp],
                     value(energy_means[sp]),
-                    value(energy_vars[sp]),
+                    √value(energy_vars[sp]),
                     value(sens_means[sp]),
-                    value(sens_vars[sp]),
+                    √value(sens_vars[sp]),
                     value(repr_means[sp]),
-                    value(repr_vars[sp]),
+                    √value(repr_vars[sp]),
                     value(speed_means[sp]),
-                    value(speed_vars[sp]),
+                    √value(speed_vars[sp]),
                 ),
             )
         end

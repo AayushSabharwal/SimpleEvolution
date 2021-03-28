@@ -54,10 +54,7 @@ function agent_step!(bact::Bacterium, model::ABM)
         best_pos = (-1, -1)
         # look for the best food nearby
         for pos in nearby_positions(bact.pos, model, bact.sensory_radius)
-            (
-                best_pos == (-1, -1) ||
-                model.food[best_pos...] < model.food[pos...]
-            ) || continue
+            best_pos == (-1, -1) || model.food[best_pos...] < model.food[pos...] || continue
             best_pos = pos
         end
         best_pos != (-1, -1) && (bact.food_target = best_pos)

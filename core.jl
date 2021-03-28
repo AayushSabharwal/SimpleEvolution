@@ -78,13 +78,13 @@ function initialize_model(
     food_data::FoodData = FoodData(),
     # model properties
     lifetime::Int = 200,    # initial lifetime for all bacteria
-    eat_rate_factor::Float64 = 5.0, # how fast all bacteria eat
+    eat_rate_factor::Float64 = 4.0, # how fast all bacteria eat
     sensory_radius_cost::Float64 = 5.0,  # energy cost multiplier for sensory radius
     distance_cost::Float64 = 5.0,    # energy cost multipler for moving unit distance
-    σ_sensory_radius::Float64 = 1.0,  # random variation in inheriting sensory radius
-    σ_reproduction_threshold::Float64 = 1.0,  # random variation in inheriting reproduction threshold
-    σ_speed::Float64 = 2.0,   # random variation in inheriting speed
-    reproduction_energy_cost::Float64 = 5.0,    # energy cost of reproduction
+    σ_sensory_radius::Float64 = 0.5,  # random variation in inheriting sensory radius
+    σ_reproduction_threshold::Float64 = 0.5,  # random variation in inheriting reproduction threshold
+    σ_speed::Float64 = 0.6,   # random variation in inheriting speed
+    reproduction_energy_cost::Float64 = 10.0,    # energy cost of reproduction
 )
     # sanity checks
     @assert size(food_distribution) == dims
@@ -126,8 +126,8 @@ function initialize_model(
             add_agent!(Bacterium, model, initial_bacterium)
         end
     else
-        for species in 0:(properties.nspecies-1)
-            for i in 1:n_bacteria[species+1]
+        for species in 1:properties.nspecies
+            for i in 1:n_bacteria[species]
                 add_agent!(Bacterium, model, initial_bacterium[species])
             end
         end
