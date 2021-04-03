@@ -24,3 +24,15 @@ function plot_agg(agglog::String; suffixes = ["energy", "sens", "repr", "speed"]
     end
     fig
 end
+
+function plot_food(foodlog::String)
+    fig = Figure(resolution = (600, 600))
+    food = h5open(foodlog, "r")
+    maxtime = size(food["log"], 1)
+    time = Slider(fig[1, 1], range = 1:maxtime, startvalue = 3)
+    cfood = @lift(food["log"][$(time.value), :, :])
+    ax = fig[0, 1] = Axis(fig)
+    heatmap!(ax, cfood)
+    
+    fig
+end

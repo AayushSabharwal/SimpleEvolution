@@ -12,6 +12,8 @@ function run!(
     foodlog::String;
     nsteps::Int = 2000,
     log_period::Int = 1,
+    log_bact::Bool = true,
+    log_food::Bool = true,
     chunk_size::Int = 1000,
 )
     agg_data = DataFrame(
@@ -37,7 +39,8 @@ function run!(
     )
     
     foodf = h5open(foodlog, "w")
-    fdata = foodf["log"] = zeros((nsteps+1, size(model.food)...))
+    foodf["log"] = zeros((floor(Int, nsteps/log_period)+1, size(model.food)...))
+    fdata = HDF5.readmmap(foodf["log"])
     appendbact = false
     appendagg = false
 
@@ -88,21 +91,22 @@ function run!(
             empty!(agg_data)
         end
 
-        if i % log_period == 0
-            for a in allagents(model)
-                push!(
-                    bactlogdf,
-                    (i, a.age, a.species, a.sensory_radius, a.reproduction_threshold, a.speed),
-                )
+        if log_period > 0 && i % log_period == 0
+            if log_bact
+                for a in allagents(model)
+                    push!(
+                        bactlogdf,
+                        (i, a.age, a.species, a.sensory_radius, a.reproduction_threshold, a.speed),
+                    )
+                end
+                if size(bactlogdf, 1) >= chunk_size
+                    CSV.write(bactlog, bactlogdf; append = appendbact)
+                    appendbact || (appendbact = true)
+                    empty!(bactlogdf)
+                end
             end
             
-            if size(bactlogdf, 1) >= chunk_size
-                CSV.write(bactlog, bactlogdf; append = appendbact)
-                appendbact || (appendbact = true)
-                empty!(bactlogdf)
-            end
-
-            fdata[i+1,:,:] = model.food
+            log_food && (fdata[floor(Int, i/log_period)+1,:,:] = model.food)
         end
         Agents.step!(model, agent_step!, food_step!)
         ProgressMeter.next!(p)

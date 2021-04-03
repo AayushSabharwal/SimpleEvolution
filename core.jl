@@ -1,5 +1,6 @@
 using Agents
 using Random
+using FileIO
 
 const AXIAL_DIRECTIONS = [-1, 0, 1]
 const NEIGHBORHOOD = [CartesianIndex(a) for a in Iterators.product([-1:1 for φ = 1:2]...) if a != (0, 0)]
@@ -25,9 +26,9 @@ end
 FoodData(; 
     neighborhood::Vector{CartesianIndex{2}} = NEIGHBORHOOD,
     food_cap::Float64 = 200.0,
-    regen_rate::Float64 = 80.0,
-    spread_multiplier::Float64 = 0.4,
-    random_spread_chance::Float64 = 0.05,
+    regen_rate::Float64 = 10.0,
+    spread_multiplier::Float64 = 0.07,
+    random_spread_chance::Float64 = 0.005,
 ) = FoodData(neighborhood, food_cap, regen_rate, spread_multiplier, random_spread_chance)
 
 Bacterium(;
@@ -71,11 +72,10 @@ inherit(parameter::Int, rng::MersenneTwister, std::Float64) =
     max(parameter + floor(Int, randn(rng) * std), 1)
 
 function initialize_model(
-    dims::Dims{2},  # size of the space
     food::Array{Float64,2};    # food at each cell
     n_bacteria::Union{Int, Array{Int}} = 10,  # number of bacteria
     initial_bacterium::Union{Bacterium, Array{Bacterium}} = Bacterium(),
-    food_data::FoodData = FoodData(),
+    food_data::FoodData = FoodData(food_cap = maximum(food)),
     # model properties
     lifetime::Int = 200,    # initial lifetime for all bacteria
     eat_rate_factor::Float64 = 4.0, # how fast all bacteria eat
@@ -87,10 +87,10 @@ function initialize_model(
     reproduction_energy_cost::Float64 = 10.0,    # energy cost of reproduction
 )
     # sanity checks
-    @assert size(food_distribution) == dims
     @assert lifetime > 0
     @assert (n_bacteria isa Array && initial_bacterium isa Array && length(n_bacteria) == length(initial_bacterium)) || (!(n_bacteria isa Array) && !(initial_bacterium isa Array))
 
+    dims = size(food)
     if initial_bacterium isa Array
         for i in 1:length(initial_bacterium)
             initial_bacterium[i].species = i
@@ -135,3 +135,5 @@ function initialize_model(
 
     return model
 end
+
+image_to_foodmap(path::String, maxfood::Real) = map(x -> Float64(x.r * maxfood), load(path))
