@@ -29,10 +29,28 @@ function plot_food(foodlog::String)
     fig = Figure(resolution = (600, 600))
     food = h5open(foodlog, "r")
     maxtime = size(food["log"], 1)
-    time = Slider(fig[1, 1], range = 1:maxtime, startvalue = 3)
+    time = Slider(fig[1, 1], range = 1:maxtime, startvalue = 1)
     cfood = @lift(food["log"][$(time.value), :, :])
     ax = fig[0, 1] = Axis(fig)
     heatmap!(ax, cfood)
     
+    fig, food
+end
+
+function plot_agent_scatter(bactlog::String; params = ["sens"])
+    df = CSV.File(bactlog; select = ["step", "species", params...]) |> DataFrame
+    n_species = maximum(df.species)
+    df = groupby(df, :species; sort = true)
+    
+    sp_cols = cgrad(:tab20; alpha=0.1)
+    fig = Figure(resolution = (600, 600))
+    for (ind, par) in enumerate(params)
+        for i in 1:n_species
+            ax = fig[ind, i] = Axis(fig; ylabel = par)
+            xlims!(ax, (0, maximum(df[1].step)))
+            scatter!(ax, df[i].step, df[i][!, par]; color = sp_cols[(i-1)/n_species], markersize = 4, strokewidth = 0)
+        end
+    end
+
     fig
 end
