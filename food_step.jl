@@ -1,5 +1,6 @@
 function food_step!(model::ABM)
-    for pos in CartesianIndices(model.food)
+    shuffle!(model.rng, model.food_update_order)
+    for pos in model.food_update_order
         if model.food[pos] == 0.0
             rand(model.rng) <= model.food_data.random_spread_chance && (model.food[pos] += model.food_data.regen_rate; continue)
 

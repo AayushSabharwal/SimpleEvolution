@@ -105,6 +105,7 @@ function initialize_model(
     properties = (
         nspecies = initial_bacterium isa Array ? length(initial_bacterium) : 1,
         food = food,
+        food_update_order = shuffle!(rng, collect(CartesianIndices(food))),
         food_data = food_data,
         lifetime = lifetime,
         eat_rate_factor = eat_rate_factor,
