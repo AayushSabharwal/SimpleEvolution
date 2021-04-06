@@ -25,8 +25,8 @@ end
 
 FoodData(; 
     neighborhood::Vector{CartesianIndex{2}} = NEIGHBORHOOD,
-    food_cap::Float64 = 200.0,
-    regen_rate::Float64 = 10.0,
+    food_cap::Real = 200.0,
+    regen_rate::Real = 10.0,
     spread_multiplier::Float64 = 0.07,
     random_spread_chance::Float64 = 0.005,
 ) = FoodData(neighborhood, food_cap, regen_rate, spread_multiplier, random_spread_chance)
@@ -73,8 +73,8 @@ inherit(parameter::Int, rng::MersenneTwister, std::Float64) =
 
 function initialize_model(
     food::Array{Float64,2};    # food at each cell
-    n_bacteria::Union{Int, Array{Int}} = 10,  # number of bacteria
-    initial_bacterium::Union{Bacterium, Array{Bacterium}} = Bacterium(),
+    n_bacteria::Union{Int, Vector{Int}} = 10,  # number of bacteria
+    initial_bacterium::Union{Bacterium, Vector{Bacterium}} = Bacterium(),
     food_data::FoodData = FoodData(food_cap = maximum(food)),
     # model properties
     lifetime::Int = 200,    # initial lifetime for all bacteria
@@ -137,4 +137,4 @@ function initialize_model(
     return model
 end
 
-image_to_foodmap(path::String, maxfood::Real) = map(x -> Float64(x.r * maxfood), load(path))
+image_to_foodmap(path::String) = map(x -> x.r, load(path))

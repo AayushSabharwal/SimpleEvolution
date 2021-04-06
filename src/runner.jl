@@ -38,9 +38,13 @@ function run!(
         repr = Float64[],
         speed = Float64[],
     )
+    
+    agglog = open(datadir(agglog), "w+")
+    log_bact && (bactlog = open(datadir(bactlog), "w+"))
+    foodlog = datadir(foodlog)
 
     if log_food
-        foodf = h5open(datapath(foodlog), "w")
+        foodf = h5open(datadir(foodlog), "w")
         foodf["log"] = zeros((floor(Int, nsteps/log_period)+1, size(model.food)...))
         fdata = HDF5.readmmap(foodf["log"])
     end
@@ -123,4 +127,45 @@ function run!(
         close(foodf)
     end
     nothing
+end
+
+# from: https://gist.github.com/oyd11/392bfdc4fabae3d7361b5e52c961edd8
+f_helper(x) = x
+f_helper(d::Dict) = Dict(Symbol(k) => f_helper(v) for (k, v) in d)
+symbol_dict(d::Dict) = f_helper(d)
+
+function runconfig(
+    config::Dict,
+    foodpath::String;
+    nsteps::Int = 2000,
+    log_period::Int = 1,
+    log_bact::Bool = true,
+    log_food::Bool = true,
+    chunk_size::Int = 1000,
+)
+    dirname = savename(config)
+    mkpath(datadir(dirname))
+    config = symbol_dict(config)
+
+    if config[:initial_bacterium] isa Array
+        if length(config[:initial_bacterium]) == 0
+            config[:initial_bacterium] = Bacterium()
+        else
+            ibact = []
+            for bconf in config[:initial_bacterium]
+                push!(ibact, Bacterium(bconf...))
+            end
+            config[:initial_bacterium] = ibact
+        end
+    elseif  config[:initial_bacterium] isa Dict
+        config[inital_bacterium] = Bacterium(config[:initial_bacterium]...)
+    end
+    
+    config[:food_data] = FoodData(; config[:food_data]...)
+
+    food = image_to_foodmap(foodpath)
+
+    model = initialize_model(food .* config[:food_data].food_cap; config...)
+
+    run!(model, joinpath(dirname, "agg.csv"), joinpath(dirname, "bact.csv"), joinpath(dirname, "food.hdf5"); nsteps, log_period, log_bact, log_food, chunk_size)
 end
