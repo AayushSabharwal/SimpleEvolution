@@ -38,10 +38,12 @@ function run!(
         repr = Float64[],
         speed = Float64[],
     )
-    
-    foodf = h5open(foodlog, "w")
-    foodf["log"] = zeros((floor(Int, nsteps/log_period)+1, size(model.food)...))
-    fdata = HDF5.readmmap(foodf["log"])
+
+    if log_food
+        foodf = h5open(datapath(foodlog), "w")
+        foodf["log"] = zeros((floor(Int, nsteps/log_period)+1, size(model.food)...))
+        fdata = HDF5.readmmap(foodf["log"])
+    end
     appendbact = false
     appendagg = false
 
@@ -112,9 +114,13 @@ function run!(
         Agents.step!(model, agent_step!, food_step!)
         ProgressMeter.next!(p)
     end
+    
     size(agg_data, 1) > 0 && CSV.write(agglog, agg_data; append = appendagg)
     size(bactlogdf, 1) > 0 && CSV.write(bactlog, bactlogdf; append = appendbact)
-    foodf["cap"] = model.food_data.food_cap
-    close(foodf)
+
+    if log_food
+        foodf["cap"] = model.food_data.food_cap
+        close(foodf)
+    end
     nothing
 end
