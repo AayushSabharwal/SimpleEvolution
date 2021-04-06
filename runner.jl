@@ -33,6 +33,7 @@ function run!(
         step = Int[],
         age = Int[],
         species = Int[],
+        energy = Float64[],
         sens = Float64[],
         repr = Float64[],
         speed = Float64[],
@@ -96,7 +97,7 @@ function run!(
                 for a in allagents(model)
                     push!(
                         bactlogdf,
-                        (i, a.age, a.species, a.sensory_radius, a.reproduction_threshold, a.speed),
+                        (i, a.age, a.species, a.energy, a.sensory_radius, a.reproduction_threshold, a.speed),
                     )
                 end
                 if size(bactlogdf, 1) >= chunk_size
