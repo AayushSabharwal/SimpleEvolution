@@ -28,7 +28,7 @@ FoodData(;
     food_cap::Real = 200.0,
     regen_rate::Real = 10.0,
     spread_multiplier::Float64 = 0.07,
-    random_spread_chance::Float64 = 0.005,
+    random_spread_chance::Float64 = 0.0005,
 ) = FoodData(neighborhood, food_cap, regen_rate, spread_multiplier, random_spread_chance)
 
 Bacterium(;

@@ -40,9 +40,8 @@ function run!(
         speed = Float64[],
     )
     
-    agglog = open(datadir(agglog), "w+")
-    log_bact && (bactlog = open(datadir(bactlog), "w+"))
-    foodlog = datadir(foodlog)
+    agglog = open(agglog, "w+")
+    log_bact && (bactlog = open(bactlog, "w+"))
 
     if log_food
         isfile(foodlog) && rm(foodlog)
@@ -126,16 +125,10 @@ function run!(
 
     if log_food
         foodf["cap"] = model.food_data.food_cap
-        print("CCC")
         close(foodf)
     end
     nothing
 end
-
-# from: https://gist.github.com/oyd11/392bfdc4fabae3d7361b5e52c961edd8
-f_helper(x) = x
-f_helper(d::Dict) = Dict(Symbol(k) => f_helper(v) for (k, v) in d)
-symbol_dict(d::Dict) = f_helper(d)
 
 function runconfig(
     config::Dict,
@@ -147,32 +140,57 @@ function runconfig(
     log_food::Bool = true,
     chunk_size::Int = 1000,
 )
-    mkpath(datadir(dirname))
-    config = symbol_dict(config)
-    println(config)
-    if config[:initial_bacterium] isa Array
-        if length(config[:initial_bacterium]) == 0
-            config[:initial_bacterium] = Bacterium()
-        else
-            ibact = Bacterium[]
-            for bconf in config[:initial_bacterium]
-                bconf = symbol_dict(bconf)
-                println(bconf...)
-                push!(ibact, Bacterium(; bconf...))
-            end
-            config[:initial_bacterium] = ibact
-        end
-    elseif  config[:initial_bacterium] isa Dict
-        config[inital_bacterium] = Bacterium(; config[:initial_bacterium]...)
-    end
-    
-    config[:n_bacteria] isa Vector && (config[:n_bacteria] = Vector{Int}(config[:n_bacteria]))
+    haskey(config, :initial_bacterium) && config[:initial_bacterium] isa Vector && (config[:initial_bacterium] = Vector{Bacterium}(config[:initial_bacterium]))
+    mkpath(dirname)
+    close(open(joinpath(dirname, "$(configname(config))"), "w"))
 
-    config[:food_data] = FoodData(; config[:food_data]...)
-    
     food = image_to_foodmap(foodpath)
-
     model = initialize_model(food .* config[:food_data].food_cap; config...)
 
     run!(model, joinpath(dirname, "agg.csv"), joinpath(dirname, "bact.csv"), joinpath(dirname, "food.hdf5"); nsteps, log_period, log_bact, log_food, chunk_size)
+end
+
+function configname(config::Dict)
+    name = ""
+    if haskey(config, :n_bacteria)
+        if config[:n_bacteria] isa Vector
+            name *= "nbx$(length(config[:n_bacteria]))"
+        else
+            name *= "nb$(config[:n_bacteria])"
+        end
+    end
+
+    if haskey(config, :initial_bacterium)
+        name *= "ib("
+        if config[:initial_bacterium] isa Vector
+            name *= "e"
+            for b in config[:initial_bacterium]
+                name*= "$(b.energy)_"
+            end
+            name *= "s"
+            for b in config[:initial_bacterium]
+                name*= "$(b.speed)_"
+            end
+            name *= "sr"
+            for b in config[:initial_bacterium]
+                name*= "$(b.sensory_radius)_"
+            end
+            name *= "r"
+            for b in config[:initial_bacterium]
+                name*= "$(b.reproduction_threshold)_"
+            end
+        else
+            b = config[:initial_bacterium]
+            name *= "e$(b.energy)s$(b.speed)sr$(b.sensory_radius)r$(b.reproduction_threshold)"
+        end
+        name *= ")"
+    end
+
+    if haskey(config, :food_data)
+        f = config[:food_data]
+        name *= "fd(c$(f.food_cap)r$(f.regen_rate))"
+    end
+
+    haskey(config, :eat_rate_factor) && (name *= "erf$(config[:eat_rate_factor])")
+    haskey(config, :lifetime) && (name *= "l$(config[:lifetime])")
 end
