@@ -1,4 +1,5 @@
 using DrWatson
+using BSON
 
 includet("core.jl")
 includet("bacterium_step.jl")
