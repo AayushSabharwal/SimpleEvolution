@@ -32,9 +32,9 @@ FoodData(;
 ) = FoodData(neighborhood, food_cap, regen_rate, spread_multiplier, random_spread_chance)
 
 Bacterium(;
-    energy::Float64 = 20.0,
-    sensory_radius::Float64 = 4.0,
-    reproduction_threshold::Float64 = 80.0,
+    energy::Real = 20.0,
+    sensory_radius::Real = 4.0,
+    reproduction_threshold::Real = 80.0,
     speed::Int = 3,
 ) = Bacterium(
     -1,

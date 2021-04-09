@@ -15,6 +15,7 @@ function run!(
     log_bact::Bool = true,
     log_food::Bool = true,
     chunk_size::Int = 1000,
+    float_precision::Int = 2,
 )
     agg_data = DataFrame(
         step = Int[],
@@ -44,7 +45,8 @@ function run!(
     foodlog = datadir(foodlog)
 
     if log_food
-        foodf = h5open(datadir(foodlog), "w")
+        isfile(foodlog) && rm(foodlog)
+        foodf = h5open(foodlog, "w")
         foodf["log"] = zeros((floor(Int, nsteps/log_period)+1, size(model.food)...))
         fdata = HDF5.readmmap(foodf["log"])
     end
@@ -81,14 +83,14 @@ function run!(
                     i,
                     sp,
                     count[sp],
-                    value(energy_means[sp]),
-                    √value(energy_vars[sp]),
-                    value(sens_means[sp]),
-                    √value(sens_vars[sp]),
-                    value(repr_means[sp]),
-                    √value(repr_vars[sp]),
-                    value(speed_means[sp]),
-                    √value(speed_vars[sp]),
+                    round(value(energy_means[sp]); digits = float_precision),
+                    round(√value(energy_vars[sp]); digits = float_precision),
+                    round(value(sens_means[sp]); digits = float_precision),
+                    round(√value(sens_vars[sp]); digits = float_precision),
+                    round(value(repr_means[sp]); digits = float_precision),
+                    round(√value(repr_vars[sp]); digits = float_precision),
+                    round(value(speed_means[sp]); digits = float_precision),
+                    round(√value(speed_vars[sp]); digits = float_precision),
                 ),
             )
         end
@@ -103,7 +105,7 @@ function run!(
                 for a in allagents(model)
                     push!(
                         bactlogdf,
-                        (i, a.age, a.species, a.energy, a.sensory_radius, a.reproduction_threshold, a.speed),
+                        (i, a.age, a.species, round(a.energy; digits = float_precision), round(a.sensory_radius; digits = float_precision), round(a.reproduction_threshold; digits = float_precision), round(a.speed; digits = float_precision),)
                     )
                 end
                 if size(bactlogdf, 1) >= chunk_size
@@ -124,6 +126,7 @@ function run!(
 
     if log_food
         foodf["cap"] = model.food_data.food_cap
+        print("CCC")
         close(foodf)
     end
     nothing
@@ -136,33 +139,37 @@ symbol_dict(d::Dict) = f_helper(d)
 
 function runconfig(
     config::Dict,
+    dirname::String,
     foodpath::String;
     nsteps::Int = 2000,
-    log_period::Int = 1,
+    log_period::Int = 10,
     log_bact::Bool = true,
     log_food::Bool = true,
     chunk_size::Int = 1000,
 )
-    dirname = savename(config)
     mkpath(datadir(dirname))
     config = symbol_dict(config)
-
+    println(config)
     if config[:initial_bacterium] isa Array
         if length(config[:initial_bacterium]) == 0
             config[:initial_bacterium] = Bacterium()
         else
-            ibact = []
+            ibact = Bacterium[]
             for bconf in config[:initial_bacterium]
-                push!(ibact, Bacterium(bconf...))
+                bconf = symbol_dict(bconf)
+                println(bconf...)
+                push!(ibact, Bacterium(; bconf...))
             end
             config[:initial_bacterium] = ibact
         end
     elseif  config[:initial_bacterium] isa Dict
-        config[inital_bacterium] = Bacterium(config[:initial_bacterium]...)
+        config[inital_bacterium] = Bacterium(; config[:initial_bacterium]...)
     end
     
-    config[:food_data] = FoodData(; config[:food_data]...)
+    config[:n_bacteria] isa Vector && (config[:n_bacteria] = Vector{Int}(config[:n_bacteria]))
 
+    config[:food_data] = FoodData(; config[:food_data]...)
+    
     food = image_to_foodmap(foodpath)
 
     model = initialize_model(food .* config[:food_data].food_cap; config...)
