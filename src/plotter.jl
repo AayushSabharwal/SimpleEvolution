@@ -37,34 +37,46 @@ function plot_food(foodlog::String)
     fig, food
 end
 
-function plot_agent_scatter(bactlog::String, agglog::String; params = ["sens", "repr", "speed"])
-    agg_df = CSV.File(agglog) |> DataFrame
+function plot_agent_scatter(dir::String; params = ["sens", "repr", "speed"], fig = Figure(resolution = (600, 600)))
+    agg_df = CSV.File(joinpath(dir, "agg.csv")) |> DataFrame
     n_species = maximum(agg_df.species)
+    stepcount = maximum(agg_df.step)
     agg_df = groupby(agg_df, :species; sort = true)
     cols = cgrad(:RdYlGn_4; alpha=0.8)
-
+    
     plotline(ax, steps, data, color) = lines!(ax, steps, data; color, linewidth = 2)
-
-    df = CSV.File(bactlog; select = ["step", "species", params...]) |> DataFrame
+    
+    df = CSV.File(joinpath(dir, "bact.csv"); select = ["step", "species", params...]) |> DataFrame
     df = groupby(df, :species; sort = true)
     
     sp_cols = cgrad(:Spectral_6; alpha=0.1)
-    fig = Figure(resolution = (600, 600))
+
+    ax = fig[1, 1:2] = Axis(fig; ylabel = "Bact population")
+    xlims!(ax, (0, stepcount))
+    lines = [plotline(ax, agg_df[i].step, agg_df[i].nbact, (sp_cols[i/n_species], 1.0)) for i in 1:n_species]
     
+    configname = filter(x -> x[1:2] == "nb", readdir(dir))[1]
     l1 = l2 = nothing
     for (ind, par) in enumerate(params)
         for i in 1:n_species
             ax = fig[1+ind, i] = Axis(fig; ylabel = par)
-            xlims!(ax, (0, maximum(df[1].step)))
+            xlims!(ax, (0, stepcount))
             scatter!(ax, df[i].step, df[i][!, par]; color = sp_cols[i/n_species], markersize = 4, strokewidth = 0)
             l1 = plotline(ax, agg_df[i].step, agg_df[i][!, "μ_$par"], cols[0.])
             l2 = plotline(ax, agg_df[i].step, agg_df[i][!, "σ_$par"], cols[1.])
         end
     end
-
-    ax = fig[1, :] = Axis(fig; ylabel = "Bact population")
-    lines = [plotline(ax, agg_df[i].step, agg_df[i].nbact, (sp_cols[i/n_species], 1.0)) for i in 1:n_species]
     
-    fig[end+1, :] = Legend(fig, [l1, l2], ["Mean", "Std"]; orientation = :horizontal)
+    fig[:, end+1] = Legend(fig, [l1, l2], ["Mean", "Std"]; orientation = :vertical)
+    fig[0, :] = Label(fig, configname)
+    fig
+end
+
+function comparative_agent_scatter(dirs::Vector{String}; params = ["sens", "repr", "speed"])
+    fig = Figure(resolution = (1200, 1200))
+
+    for (i, dir) in enumerate(dirs)
+        plot_agent_scatter(dir; params, fig = fig[1, i])
+    end
     fig
 end
