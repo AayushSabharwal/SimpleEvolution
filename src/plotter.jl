@@ -2,9 +2,9 @@ using GLMakie
 using Colors
 
 const BG = colorant"#191919"
-const AX = colorant"#646663"
-const TX = colorant"#717280"
-const GR = colorant"#4b4c4a"
+const AX = colorant"#ababac"
+const TX = colorant"#cdcdcf"
+const GR = colorant"#717280"
 const THEME = Theme(
     backgroundcolor = BG,
     Axis = (
@@ -26,6 +26,9 @@ const THEME = Theme(
 )
 set_theme!(THEME)
 
+const PARAM_MAP =
+    Dict("repr" => "Reproduction Threshold", "speed" => "Speed", "sens" => "Sensory Radius")
+
 function plot_food(foodlog::String)
     fig = Figure(resolution = (600, 600))
     food = h5open(foodlog, "r")
@@ -33,15 +36,31 @@ function plot_food(foodlog::String)
     time = Slider(fig[1, 1], range = 1:maxtime, startvalue = 1)
     cfood = @lift(food["log"][$(time.value), :, :])
     ax = fig[0, 1] = Axis(fig)
-    heatmap!(ax, cfood)
+    heatmap!(ax, cfood, colorrange = (0, food["cap"][]))
 
     fig, food
+end
+
+function record_food(foodlog::String, filename::String; duration::Real = 10)
+    fig = Figure(resolution = (600, 600), figure_padding = 0)
+    food = h5open(foodlog, "r")
+    maxtime = size(food["log"], 1)
+    ax = fig[1, 1] = Axis(fig)
+    hidedecorations!(ax)
+    time = Observable(1)
+    cfood = @lift(food["log"][$(time), :, :])
+
+    heatmap!(ax, cfood, colorrange = (0, food["cap"][]))
+    record(fig, filename, 1:maxtime; framerate = floor(Int, maxtime / duration)) do i
+        time[] = i
+    end
+    close(food)
 end
 
 function plot_agent_scatter(
     dir::String;
     params = ["sens", "repr", "speed"],
-    fig = Figure(resolution = (600, 600)),
+    fig = Figure(resolution = (1600, 900)),
     plotbact = false,
 )
     agg_df = CSV.File(joinpath(dir, "agg.csv")) |> DataFrame
@@ -64,7 +83,7 @@ function plot_agent_scatter(
     ax =
         fig[1, :] = Axis(
             fig;
-            ylabel = "Bact population",
+            ylabel = "Population",
             xticks = 0:500:stepcount,
             xticksvisible = false,
             xticklabelsvisible = false,
@@ -76,7 +95,7 @@ function plot_agent_scatter(
         ax =
             fig[ind+1, :] = Axis(
                 fig;
-                ylabel = par,
+                ylabel = PARAM_MAP[par],
                 xticks = 0:500:stepcount,
                 xticksvisible = ind == length(params),
                 xticklabelsvisible = ind == length(params),
@@ -109,6 +128,7 @@ function plot_agent_scatter(
             ["Mean" for _ = 1:n_species];
             orientation = :horizontal,
             tellwidth = false,
+            tellheight = true,
         )
     fig
 end
