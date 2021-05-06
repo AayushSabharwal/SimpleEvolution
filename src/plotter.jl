@@ -1,29 +1,30 @@
 using GLMakie
+using Colors
 
-function plot_agg(agglog::String; suffixes = ["energy", "sens", "repr", "speed"])
-    df = CSV.File(agglog) |> DataFrame
-    nspecies = maximum(df.species)
-    gdf = groupby(df, :species; sort = true)
-    fig = Figure(resolution = (1600, 1000))
-    cols = cgrad(:lighttest; alpha=0.4)
-    
-
-    plotline(ax, steps, data, color) = lines!(ax, steps, data; color, linewidth = 2)
-
-    ax = fig[1, 1] = Axis(fig; ylabel = "Bact population")
-    lines = [plotline(ax, gdf[i].step, gdf[i].nbact, cols[i/nspecies]) for i in 1:nspecies]
-
-    for suffix in suffixes
-        axm = fig[end+1, 1] = Axis(fig; ylabel = "Mean $suffix")
-        axs = fig[end, 2] = Axis(fig; ylabel = "Std $suffix")
-
-        for i in 1:nspecies
-            plotline(axm, gdf[i].step, gdf[i][!, "μ_$suffix"], cols[i/nspecies])
-            plotline(axs, gdf[i].step, gdf[i][!, "σ_$suffix"], cols[i/nspecies])
-        end
-    end
-    fig
-end
+const BG = colorant"#191919"
+const AX = colorant"#646663"
+const TX = colorant"#717280"
+const GR = colorant"#4b4c4a"
+const THEME = Theme(
+    backgroundcolor = BG,
+    Axis = (
+        backgroundcolor = :transparent,
+        bottomspinecolor = AX,
+        leftspinecolor = AX,
+        rightspinecolor = AX,
+        topspinecolor = AX,
+        xgridcolor = GR,
+        xtickcolor = AX,
+        xlabelcolor = TX,
+        xticklabelcolor = TX,
+        ygridcolor = GR,
+        ytickcolor = AX,
+        ylabelcolor = TX,
+        yticklabelcolor = TX,
+    ),
+    Legend = (bgcolor = :transparent, framecolor = AX, labelcolor = TX),
+)
+set_theme!(THEME)
 
 function plot_food(foodlog::String)
     fig = Figure(resolution = (600, 600))
@@ -33,50 +34,90 @@ function plot_food(foodlog::String)
     cfood = @lift(food["log"][$(time.value), :, :])
     ax = fig[0, 1] = Axis(fig)
     heatmap!(ax, cfood)
-    
+
     fig, food
 end
 
-function plot_agent_scatter(dir::String; params = ["sens", "repr", "speed"], fig = Figure(resolution = (600, 600)))
+function plot_agent_scatter(
+    dir::String;
+    params = ["sens", "repr", "speed"],
+    fig = Figure(resolution = (600, 600)),
+    plotbact = false,
+)
     agg_df = CSV.File(joinpath(dir, "agg.csv")) |> DataFrame
     n_species = maximum(agg_df.species)
     stepcount = maximum(agg_df.step)
     agg_df = groupby(agg_df, :species; sort = true)
-    cols = cgrad(:RdYlGn_4; alpha=0.8)
-    
-    plotline(ax, steps, data, color) = lines!(ax, steps, data; color, linewidth = 2)
-    
-    df = CSV.File(joinpath(dir, "bact.csv"); select = ["step", "species", params...]) |> DataFrame
-    df = groupby(df, :species; sort = true)
-    
-    sp_cols = cgrad(:Spectral_6; alpha=0.1)
 
-    ax = fig[1, 1:2] = Axis(fig; ylabel = "Bact population")
+    plotline(ax, steps, data, color) = lines!(ax, steps, data; color, linewidth = 2)
+
+    if plotbact
+        df =
+            CSV.File(joinpath(dir, "bact.csv"); select = ["step", "species", params...]) |>
+            DataFrame
+        df = groupby(df, :species; sort = true)
+        scatter_cols = distinguishable_colors(n_species, HSV(0, 0.6, 1))
+    end
+
+    sp_cols = distinguishable_colors(n_species, HSV(0, 0.6, 1))
+
+    ax =
+        fig[1, :] = Axis(
+            fig;
+            ylabel = "Bact population",
+            xticks = 0:500:stepcount,
+            xticksvisible = false,
+            xticklabelsvisible = false,
+        )
     xlims!(ax, (0, stepcount))
-    lines = [plotline(ax, agg_df[i].step, agg_df[i].nbact, (sp_cols[i/n_species], 1.0)) for i in 1:n_species]
-    
-    configname = filter(x -> x[1:2] == "nb", readdir(dir))[1]
-    l1 = l2 = nothing
+    lines = [plotline(ax, agg_df[i].step, agg_df[i].nbact, sp_cols[i]) for i = 1:n_species]
+
     for (ind, par) in enumerate(params)
-        for i in 1:n_species
-            ax = fig[1+ind, i] = Axis(fig; ylabel = par)
+        ax =
+            fig[ind+1, :] = Axis(
+                fig;
+                ylabel = par,
+                xticks = 0:500:stepcount,
+                xticksvisible = ind == length(params),
+                xticklabelsvisible = ind == length(params),
+            )
+        for i = 1:n_species
             xlims!(ax, (0, stepcount))
-            scatter!(ax, df[i].step, df[i][!, par]; color = sp_cols[i/n_species], markersize = 4, strokewidth = 0)
-            l1 = plotline(ax, agg_df[i].step, agg_df[i][!, "μ_$par"], cols[0.])
-            l2 = plotline(ax, agg_df[i].step, agg_df[i][!, "σ_$par"], cols[1.])
+            plotbact && scatter!(
+                ax,
+                df[i].step,
+                df[i][!, par];
+                color = (scatter_cols[i], 0.01),
+                markersize = 4,
+                strokewidth = 0,
+            )
+            plotline(ax, agg_df[i].step, agg_df[i][!, "μ_$par"], (sp_cols[i], 0.7))
+            band!(
+                ax,
+                agg_df[i].step,
+                agg_df[i][!, "μ_$par"] .- agg_df[i][!, "σ_$par"],
+                agg_df[i][!, "μ_$par"] .+ agg_df[i][!, "σ_$par"],
+                color = (sp_cols[i], 0.2),
+            )
         end
     end
-    
-    fig[:, end+1] = Legend(fig, [l1, l2], ["Mean", "Std"]; orientation = :vertical)
-    fig[0, :] = Label(fig, configname)
+
+    leg =
+        fig[length(params)+2, :] = Legend(
+            fig,
+            lines,
+            ["Mean" for _ = 1:n_species];
+            orientation = :horizontal,
+            tellwidth = false,
+        )
     fig
 end
 
-function comparative_agent_scatter(dirs::Vector{String}; params = ["sens", "repr", "speed"])
+function comparative_agent_scatter(dirs::Vector{String}; kwargs...)
     fig = Figure(resolution = (1200, 1200))
 
     for (i, dir) in enumerate(dirs)
-        plot_agent_scatter(dir; params, fig = fig[1, i])
+        plot_agent_scatter(dir; fig = fig[1, i], kwargs...)
     end
     fig
 end

@@ -39,14 +39,14 @@ function run!(
         repr = Float64[],
         speed = Float64[],
     )
-    
+
     agglog = open(agglog, "w+")
     log_bact && (bactlog = open(bactlog, "w+"))
 
     if log_food
         isfile(foodlog) && rm(foodlog)
         foodf = h5open(foodlog, "w")
-        foodf["log"] = zeros((floor(Int, nsteps/log_period)+1, size(model.food)...))
+        foodf["log"] = zeros((floor(Int, nsteps / log_period) + 1, size(model.food)...))
         fdata = HDF5.readmmap(foodf["log"])
     end
     appendbact = false
@@ -54,15 +54,16 @@ function run!(
 
     p = Progress(nsteps; barglyphs = BarGlyphs("[=> ]"), color = :blue)
     for i = 0:nsteps
-        count = [0 for _ in 1:model.nspecies]
-        energy_means = [Mean() for _ in 1:model.nspecies]
-        energy_vars = [Variance() for _ in 1:model.nspecies]
-        sens_means = [Mean() for _ in 1:model.nspecies]
-        sens_vars = [Variance() for _ in 1:model.nspecies]
-        repr_means = [Mean() for _ in 1:model.nspecies]
-        repr_vars = [Variance() for _ in 1:model.nspecies]
-        speed_means = [Mean() for _ in 1:model.nspecies]
-        speed_vars = [Variance() for _ in 1:model.nspecies]
+        nagents(model) == 0 && break
+        count = [0 for _ = 1:model.nspecies]
+        energy_means = [Mean() for _ = 1:model.nspecies]
+        energy_vars = [Variance() for _ = 1:model.nspecies]
+        sens_means = [Mean() for _ = 1:model.nspecies]
+        sens_vars = [Variance() for _ = 1:model.nspecies]
+        repr_means = [Mean() for _ = 1:model.nspecies]
+        repr_vars = [Variance() for _ = 1:model.nspecies]
+        speed_means = [Mean() for _ = 1:model.nspecies]
+        speed_vars = [Variance() for _ = 1:model.nspecies]
 
         for a in allagents(model)
             count[a.species] += 1
@@ -75,7 +76,7 @@ function run!(
             fit!(speed_means[a.species], a.speed)
             fit!(speed_vars[a.species], a.speed)
         end
-        for sp in 1:model.nspecies
+        for sp = 1:model.nspecies
             push!(
                 agg_data,
                 (
@@ -104,7 +105,15 @@ function run!(
                 for a in allagents(model)
                     push!(
                         bactlogdf,
-                        (i, a.age, a.species, round(a.energy; digits = float_precision), round(a.sensory_radius; digits = float_precision), round(a.reproduction_threshold; digits = float_precision), round(a.speed; digits = float_precision),)
+                        (
+                            i,
+                            a.age,
+                            a.species,
+                            round(a.energy; digits = float_precision),
+                            round(a.sensory_radius; digits = float_precision),
+                            round(a.reproduction_threshold; digits = float_precision),
+                            round(a.speed; digits = float_precision),
+                        ),
                     )
                 end
                 if size(bactlogdf, 1) >= chunk_size
@@ -113,13 +122,13 @@ function run!(
                     empty!(bactlogdf)
                 end
             end
-            
-            log_food && (fdata[floor(Int, i/log_period)+1,:,:] = model.food)
+
+            log_food && (fdata[floor(Int, i / log_period)+1, :, :] = model.food)
         end
         Agents.step!(model, agent_step!, food_step!)
-        ProgressMeter.next!(p)
+        ProgressMeter.next!(p; showvalues = [(:steps, i), (:population, nagents(model))])
     end
-    
+
     size(agg_data, 1) > 0 && CSV.write(agglog, agg_data; append = appendagg)
     size(bactlogdf, 1) > 0 && CSV.write(bactlog, bactlogdf; append = appendbact)
 
@@ -131,7 +140,7 @@ function run!(
 end
 
 function runconfig(
-    config::Dict,
+    config,
     dirname::String,
     foodpath::String;
     nsteps::Int = 2000,
@@ -139,15 +148,30 @@ function runconfig(
     log_bact::Bool = true,
     log_food::Bool = true,
     chunk_size::Int = 1000,
+    saveconfig::Bool = false,
 )
-    haskey(config, :initial_bacterium) && config[:initial_bacterium] isa Vector && (config[:initial_bacterium] = Vector{Bacterium}(config[:initial_bacterium]))
+    haskey(config, :initial_bacterium) &&
+        config[:initial_bacterium] isa Vector &&
+        (config[:initial_bacterium] = Vector{Bacterium}(config[:initial_bacterium]))
     mkpath(dirname)
     close(open(joinpath(dirname, "$(configname(config))"), "w"))
 
     food = image_to_foodmap(foodpath)
     model = initialize_model(food .* config[:food_data].food_cap; config...)
 
-    run!(model, joinpath(dirname, "agg.csv"), joinpath(dirname, "bact.csv"), joinpath(dirname, "food.hdf5"); nsteps, log_period, log_bact, log_food, chunk_size)
+    run!(
+        model,
+        joinpath(dirname, "agg.csv"),
+        joinpath(dirname, "bact.csv"),
+        joinpath(dirname, "food.hdf5");
+        nsteps,
+        log_period,
+        log_bact,
+        log_food,
+        chunk_size,
+    )
+    saveconfig && bson(joinpath(dirname, "config.bson"), config)
+    return model
 end
 
 function configname(config::Dict)
@@ -165,19 +189,19 @@ function configname(config::Dict)
         if config[:initial_bacterium] isa Vector
             name *= "e"
             for b in config[:initial_bacterium]
-                name*= "$(b.energy)_"
+                name *= "$(b.energy)_"
             end
             name *= "s"
             for b in config[:initial_bacterium]
-                name*= "$(b.speed)_"
+                name *= "$(b.speed)_"
             end
             name *= "sr"
             for b in config[:initial_bacterium]
-                name*= "$(b.sensory_radius)_"
+                name *= "$(b.sensory_radius)_"
             end
             name *= "r"
             for b in config[:initial_bacterium]
-                name*= "$(b.reproduction_threshold)_"
+                name *= "$(b.reproduction_threshold)_"
             end
         else
             b = config[:initial_bacterium]

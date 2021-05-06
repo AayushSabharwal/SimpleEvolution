@@ -3,7 +3,8 @@ using Random
 using FileIO
 
 const AXIAL_DIRECTIONS = [-1, 0, 1]
-const NEIGHBORHOOD = [CartesianIndex(a) for a in Iterators.product([-1:1 for φ = 1:2]...) if a != (0, 0)]
+const NEIGHBORHOOD =
+    [CartesianIndex(a) for a in Iterators.product([-1:1 for φ = 1:2]...) if a != (0, 0)]
 
 @agent Bacterium GridAgent{2} begin
     species::Int
@@ -23,7 +24,7 @@ struct FoodData
     random_spread_chance::Float64
 end
 
-FoodData(; 
+FoodData(;
     neighborhood::Vector{CartesianIndex{2}} = NEIGHBORHOOD,
     food_cap::Real = 200.0,
     regen_rate::Real = 10.0,
@@ -73,8 +74,8 @@ inherit(parameter::Int, rng::MersenneTwister, std::Float64) =
 
 function initialize_model(
     food::Array{Float64,2};    # food at each cell
-    n_bacteria::Union{Int, Vector{Int}} = 10,  # number of bacteria
-    initial_bacterium::Union{Bacterium, Vector{Bacterium}} = Bacterium(),
+    n_bacteria::Union{Int,Vector{Int}} = 10,  # number of bacteria
+    initial_bacterium::Union{Bacterium,Vector{Bacterium}} = Bacterium(),
     food_data::FoodData = FoodData(food_cap = maximum(food)),
     # model properties
     lifetime::Int = 200,    # initial lifetime for all bacteria
@@ -88,11 +89,15 @@ function initialize_model(
 )
     # sanity checks
     @assert lifetime > 0
-    @assert (n_bacteria isa Array && initial_bacterium isa Array && length(n_bacteria) == length(initial_bacterium)) || (!(n_bacteria isa Array) && !(initial_bacterium isa Array))
+    @assert (
+        n_bacteria isa Array &&
+        initial_bacterium isa Array &&
+        length(n_bacteria) == length(initial_bacterium)
+    ) || (!(n_bacteria isa Array) && !(initial_bacterium isa Array))
 
     dims = size(food)
     if initial_bacterium isa Array
-        for i in 1:length(initial_bacterium)
+        for i = 1:length(initial_bacterium)
             initial_bacterium[i].species = i
         end
     else
@@ -123,12 +128,12 @@ function initialize_model(
 
     # add bacteria at random places
     if n_bacteria isa Int
-        for i in 1:n_bacteria
+        for i = 1:n_bacteria
             add_agent!(Bacterium, model, initial_bacterium)
         end
     else
-        for species in 1:properties.nspecies
-            for i in 1:n_bacteria[species]
+        for species = 1:properties.nspecies
+            for i = 1:n_bacteria[species]
                 add_agent!(Bacterium, model, initial_bacterium[species])
             end
         end
