@@ -11,19 +11,20 @@ const NEIGHBORHOOD =
     age::Int        # age, in iterations. They only live so long
     energy::Float64 # energy. Less than zero, it dies. More than threshold, it doubles
     sensory_radius::Float64 # how far it can see food
-    reproduction_threshold::Float64 # see above
+    reproduction_threshold::Float64 # threshold energy to reproduce by binary fission
     speed::Int      # how far it can move in one iteration
-    food_target::Dims{2}    # the food it can see
+    food_target::Dims{2}    # the food it is moving toward
 end
 
 struct FoodData
-    neighborhood::Vector{CartesianIndex{2}}
-    food_cap::Float64
-    regen_rate::Float64
-    spread_multiplier::Float64
-    random_spread_chance::Float64
+    neighborhood::Vector{CartesianIndex{2}} # what neighbors can food spread to
+    food_cap::Float64   # limit on maximum food in one tile
+    regen_rate::Float64 # regeneration rate for food tiles
+    spread_multiplier::Float64  # proportionality constant for food spreading
+    random_spread_chance::Float64   # probability of random spread
 end
 
+### Constructors
 FoodData(;
     neighborhood::Vector{CartesianIndex{2}} = NEIGHBORHOOD,
     food_cap::Real = 200.0,
@@ -72,20 +73,45 @@ inherit(parameter::Float64, rng::MersenneTwister, std::Float64) =
 inherit(parameter::Int, rng::MersenneTwister, std::Float64) =
     max(parameter + floor(Int, randn(rng) * std), 1)
 
+"""
+function initialize_model(food::Array{Float64,2}, n_bacteria::Union{Int,Vector{Int}}; kwargs...)
+
+Initialize a model with given food distribution and number of bacteria
+
+Keyword arguments
+-----------------
+- `initial_bacterium`: `Bacterium` denoting the initial values of parameters. `Vector{Bacterium}`
+  for multiple species of bacteria. In such a case, `n_bacteria` should be a vector corresponding
+  to the population of each species.
+- `food_data` : `FoodData` parametrising the food spread
+- `lifetime` : Maximum lifetime of a bacterium
+- `eat_rate_factor` : Multiplied by a bacterium's `speed` to obtain the amount of food it will
+  eat in one iteration
+- `sensory_radius_cost`: Multipled by a bacterium's `sensory_radius` to obtain the corresponding
+  energy cost
+- `distance_cost` : Multipled by the distance a bacterium moves in one iteration to obtain the
+  corresponding energy cost
+- `σ_sensory_radius` : Standard deviation of normal distribution describing variation in
+  `sensory_radius` over generations
+- `σ_reproduction_threshold` : Similar to above, for `reproduction_threshold`
+- `σ_speed` : Similar to above, for `speed`
+- `reproduction_energy_cost` : Energy cost of reproduction
+- `random_seed` : Seed for RNG used by the model
+"""
 function initialize_model(
-    food::Array{Float64,2};    # food at each cell
-    n_bacteria::Union{Int,Vector{Int}} = 10,  # number of bacteria
+    food::Array{Float64,2};
+    n_bacteria::Union{Int,Vector{Int}} = 10,
     initial_bacterium::Union{Bacterium,Vector{Bacterium}} = Bacterium(),
     food_data::FoodData = FoodData(food_cap = maximum(food)),
-    # model properties
-    lifetime::Int = 200,    # initial lifetime for all bacteria
-    eat_rate_factor::Float64 = 4.0, # how fast all bacteria eat
-    sensory_radius_cost::Float64 = 5.0,  # energy cost multiplier for sensory radius
-    distance_cost::Float64 = 5.0,    # energy cost multipler for moving unit distance
-    σ_sensory_radius::Float64 = 0.5,  # random variation in inheriting sensory radius
-    σ_reproduction_threshold::Float64 = 0.5,  # random variation in inheriting reproduction threshold
-    σ_speed::Float64 = 0.6,   # random variation in inheriting speed
-    reproduction_energy_cost::Float64 = 10.0,    # energy cost of reproduction
+    lifetime::Int = 200,
+    eat_rate_factor::Float64 = 4.0,
+    sensory_radius_cost::Float64 = 5.0,
+    distance_cost::Float64 = 5.0,
+    σ_sensory_radius::Float64 = 0.5,
+    σ_reproduction_threshold::Float64 = 0.5,
+    σ_speed::Float64 = 0.6,
+    reproduction_energy_cost::Float64 = 10.0,
+    random_seed::Int = 42,
 )
     # sanity checks
     @assert lifetime > 0
@@ -105,7 +131,7 @@ function initialize_model(
     end
 
     # reproducibility matters
-    rng = MersenneTwister(42)
+    rng = MersenneTwister(random_seed)
 
     properties = (
         nspecies = initial_bacterium isa Array ? length(initial_bacterium) : 1,
@@ -128,12 +154,12 @@ function initialize_model(
 
     # add bacteria at random places
     if n_bacteria isa Int
-        for i = 1:n_bacteria
+        for _ = 1:n_bacteria
             add_agent!(Bacterium, model, initial_bacterium)
         end
     else
         for species = 1:properties.nspecies
-            for i = 1:n_bacteria[species]
+            for _ = 1:n_bacteria[species]
                 add_agent!(Bacterium, model, initial_bacterium[species])
             end
         end
@@ -142,4 +168,10 @@ function initialize_model(
     return model
 end
 
+"""
+    image_to_foodmap(path::String)
+
+Reads image at given path, returns a matrix representing relative food concentrations,
+using the red channel of RGB value at each pixel.
+"""
 image_to_foodmap(path::String) = map(x -> x.r, load(path))

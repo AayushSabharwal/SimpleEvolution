@@ -1,8 +1,8 @@
 """
     reproduce!(bact::Bacterium, model::ABM)
 
-Simulates reproduction of bacteria. Energy is halved after subtracting a cost. Inherited features are
-varied.
+Simulates reproduction of bacteria. Energy is halved after subtracting a cost. Inherited
+features are varied.
 """
 function reproduce!(bact::Bacterium, model::ABM)
     add_agent!(

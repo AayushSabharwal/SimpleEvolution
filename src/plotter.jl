@@ -1,6 +1,8 @@
+using CairoMakie
 using GLMakie
 using Colors
 
+# Theme used
 const BG = colorant"#191919"
 const AX = colorant"#ababac"
 const TX = colorant"#cdcdcf"
@@ -23,12 +25,14 @@ const THEME = Theme(
         yticklabelcolor = TX,
     ),
     Legend = (bgcolor = :transparent, framecolor = AX, labelcolor = TX),
+    Label = (color = TX,),
 )
 set_theme!(THEME)
-
+# Full names of parameters
 const PARAM_MAP =
     Dict("repr" => "Reproduction Threshold", "speed" => "Speed", "sens" => "Sensory Radius")
 
+# Plot the food as a heatmap, with a slider for interactivity
 function plot_food(foodlog::String)
     fig = Figure(resolution = (600, 600))
     food = h5open(foodlog, "r")
@@ -41,22 +45,33 @@ function plot_food(foodlog::String)
     fig, food
 end
 
-function record_food(foodlog::String, filename::String; duration::Real = 10)
+# Record the food map playing through steps
+function record_food(
+    foodlog::String,
+    filename::String;
+    duration::Real = 10,
+    nsteps::Int = -1,
+)
+    CairoMakie.activate!()
     fig = Figure(resolution = (600, 600), figure_padding = 0)
     food = h5open(foodlog, "r")
     maxtime = size(food["log"], 1)
-    ax = fig[1, 1] = Axis(fig)
+    nsteps = nsteps <= 0 ? maxtime : min(nsteps, maxtime)
+    ax = fig[1, 1] = Axis(fig; aspect = AxisAspect(1))
     hidedecorations!(ax)
     time = Observable(1)
     cfood = @lift(food["log"][$(time), :, :])
-
+    titletext = @lift("Step: $($(time))")
+    fig[0, 1] = Label(fig, titletext; tellwidth = false)
     heatmap!(ax, cfood, colorrange = (0, food["cap"][]))
-    record(fig, filename, 1:maxtime; framerate = floor(Int, maxtime / duration)) do i
+    record(fig, filename, 1:nsteps; framerate = floor(Int, nsteps / duration)) do i
         time[] = i
     end
     close(food)
+    GLMakie.activate!()
 end
 
+# Plot data of the simulation
 function plot_agent_scatter(
     dir::String;
     params = ["sens", "repr", "speed"],
@@ -66,6 +81,9 @@ function plot_agent_scatter(
     agg_df = CSV.File(joinpath(dir, "agg.csv")) |> DataFrame
     n_species = maximum(agg_df.species)
     stepcount = maximum(agg_df.step)
+    print(agg_df.step)
+    print(stepcount)
+    print(typeof(stepcount))
     agg_df = groupby(agg_df, :species; sort = true)
 
     plotline(ax, steps, data, color) = lines!(ax, steps, data; color, linewidth = 2)
@@ -110,13 +128,13 @@ function plot_agent_scatter(
                 markersize = 4,
                 strokewidth = 0,
             )
-            plotline(ax, agg_df[i].step, agg_df[i][!, "μ_$par"], (sp_cols[i], 0.7))
+            plotline(ax, agg_df[i].step, agg_df[i][!, "μ_$par"], sp_cols[i])
             band!(
                 ax,
                 agg_df[i].step,
                 agg_df[i][!, "μ_$par"] .- agg_df[i][!, "σ_$par"],
                 agg_df[i][!, "μ_$par"] .+ agg_df[i][!, "σ_$par"],
-                color = (sp_cols[i], 0.2),
+                color = (sp_cols[i], 0.25),
             )
         end
     end
@@ -133,6 +151,7 @@ function plot_agent_scatter(
     fig
 end
 
+# Multiple `plot_agent_scatter` side by side
 function comparative_agent_scatter(dirs::Vector{String}; kwargs...)
     fig = Figure(resolution = (1200, 1200))
 

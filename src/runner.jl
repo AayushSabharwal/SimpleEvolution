@@ -5,6 +5,23 @@ using ProgressMeter
 using OnlineStats
 using HDF5
 
+"""
+    run(model, agglog, bactlog, foodlog; kwargs...)
+
+Runs the given `model`. Aggregate data is logged to file at `agglog` (csv). Data of individual
+bacteria is logged to `bactlog` (csv), and the food grid is written to `foodlog` (hdf5).
+
+Keyword arguments
+-----------------
+
+- `nsteps = 2000` : Number of steps to run the simulation for
+- `log_period = 1` : Periodicity of logging bacterium and food data. Use negative value
+  to disable
+- `log_bact = true` : Choose whether to log bacteria data
+- `log_food = true` : Choose whether to log food map
+- `chunk_size = 1000` : How many rows should be written to csv files at a time
+- `float_precision = 2` : How many decimals of precision should there be in the csv files
+"""
 function run!(
     model::ABM,
     agglog::String,
@@ -139,6 +156,17 @@ function run!(
     nothing
 end
 
+"""
+    runconfig(config, dirname, foodpath; kwargs...)
+
+Create a model with given `config`, run it using `foodmap` as the initial food distribution,
+and log data to `dirname`.
+
+Keyword arguments
+-----------------
+- See `run!`
+- `saveconfig = false` whether the given config file should also be saved to `dirname` as BSON
+"""
 function runconfig(
     config,
     dirname::String,
@@ -148,6 +176,7 @@ function runconfig(
     log_bact::Bool = true,
     log_food::Bool = true,
     chunk_size::Int = 1000,
+    float_precision::Int = 2,
     saveconfig::Bool = false,
 )
     haskey(config, :initial_bacterium) &&
@@ -169,11 +198,17 @@ function runconfig(
         log_bact,
         log_food,
         chunk_size,
+        float_precision,
     )
     saveconfig && bson(joinpath(dirname, "config.bson"), config)
     return model
 end
 
+"""
+    configname(config)
+
+Generate a highly abbreviated name for a config
+"""
 function configname(config::Dict)
     name = ""
     if haskey(config, :n_bacteria)
